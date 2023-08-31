@@ -1,5 +1,3 @@
-package jframe;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -8,25 +6,33 @@ import java.awt.event.ActionListener;
 public class CalculadoraCompleta {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            criarGUI();
+            createGUI();
         });
     }
 
-    public static void criarGUI() {
-        JFrame janela = new JFrame("Calculadora Completa");
-        janela.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        janela.setSize(300, 400);
-        janela.setLayout(new BorderLayout());
-        janela.setLocationRelativeTo(null);
+    public static void createGUI() {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
+            e.printStackTrace();
+        }
 
-        JTextField campoTexto = new JTextField();
-        campoTexto.setEditable(false);
-        janela.add(campoTexto, BorderLayout.NORTH);
+        JFrame window = new JFrame("Calculadora no Estilo do Windows 11");
+        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        window.setSize(300, 400);
+        window.setLayout(new BorderLayout());
+        window.setLocationRelativeTo(null);
 
-        JPanel painelBotoes = new JPanel(new GridLayout(4, 4));
+        JTextField textField = new JTextField();
+        textField.setEditable(false);
+        textField.setHorizontalAlignment(JTextField.RIGHT);
+        window.add(textField, BorderLayout.NORTH);
 
-        JButton[] botoes = new JButton[16];
-        String[] botoesLabels = {
+        JPanel buttonPanel = new JPanel(new GridLayout(4, 4, 5, 5));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JButton[] buttons = new JButton[16];
+        String[] buttonLabels = {
             "7", "8", "9", "/",
             "4", "5", "6", "*",
             "1", "2", "3", "-",
@@ -34,105 +40,106 @@ public class CalculadoraCompleta {
         };
 
         for (int i = 0; i < 16; i++) {
-            botoes[i] = new JButton(botoesLabels[i]);
-            final String label = botoesLabels[i];
-            botoes[i].addActionListener(new ActionListener() {
+            buttons[i] = new JButton(buttonLabels[i]);
+            buttons[i].setFont(new Font("Segoe UI", Font.PLAIN, 18));
+            buttons[i].setBackground(new Color(245, 245, 245));
+            buttons[i].addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
+                    String label = ((JButton) e.getSource()).getText();
                     if (label.equals("C")) {
-                        campoTexto.setText("");
+                        textField.setText("");
                     } else if (label.equals("=")) {
-                        String expression = campoTexto.getText();
+                        String expression = textField.getText();
                         try {
                             double result = eval(expression);
-                            campoTexto.setText(String.valueOf(result));
+                            textField.setText(String.valueOf(result));
                         } catch (Exception ex) {
-                            campoTexto.setText("Erro");
+                            textField.setText("Erro");
                         }
                     } else {
-                        campoTexto.setText(campoTexto.getText() + label);
+                        textField.setText(textField.getText() + label);
                     }
                 }
+
+                private double eval(String expression) {
+                    return new Object() {
+                        int pos = -1, ch;
+
+                        void nextChar() {
+                            ch = (++pos < expression.length()) ? expression.charAt(pos) : -1;
+                        }
+
+                        boolean eat(int charToEat) {
+                            while (ch == ' ')
+                                nextChar();
+                            if (ch == charToEat) {
+                                nextChar();
+                                return true;
+                            }
+                            return false;
+                        }
+
+                        double parse() {
+                            nextChar();
+                            double x = parseExpression();
+                            if (pos < expression.length())
+                                throw new RuntimeException("Caractere inesperado: " + (char) ch);
+                            return x;
+                        }
+
+                        double parseExpression() {
+                            double x = parseTerm();
+                            for (;;) {
+                                if (eat('+'))
+                                    x += parseTerm(); // Adição
+                                else if (eat('-'))
+                                    x -= parseTerm(); // Subtração
+                                else
+                                    return x;
+                            }
+                        }
+
+                        double parseTerm() {
+                            double x = parseFactor();
+                            for (;;) {
+                                if (eat('*'))
+                                    x *= parseFactor(); // Multiplicação
+                                else if (eat('/'))
+                                    x /= parseFactor(); // Divisão
+                                else
+                                    return x;
+                            }
+                        }
+
+                        double parseFactor() {
+                            if (eat('+'))
+                                return parseFactor(); // + unário
+                            if (eat('-'))
+                                return -parseFactor(); // - unário
+
+                            double x;
+                            int startPos = this.pos;
+                            if (eat('(')) { // Parênteses
+                                x = parseExpression();
+                                eat(')');
+                            } else if ((ch >= '0' && ch <= '9') || ch == '.') { // Números
+                                while ((ch >= '0' && ch <= '9') || ch == '.')
+                                    nextChar();
+                                x = Double.parseDouble(expression.substring(startPos, this.pos));
+                            } else {
+                                throw new RuntimeException("Caractere inesperado: " + (char) ch);
+                            }
+
+                            return x;
+                        }
+                    }.parse();
+                }
             });
-            painelBotoes.add(botoes[i]);
+            buttonPanel.add(buttons[i]);
         }
 
-        janela.add(painelBotoes, BorderLayout.CENTER);
+        window.add(buttonPanel, BorderLayout.CENTER);
 
-        janela.setVisible(true);
-    }
-
-    // Função para avaliar a expressão matemática
-    public static double eval(String expression) {
-        return new Object() {
-            int pos = -1, ch;
-
-            void nextChar() {
-                ch = (++pos < expression.length()) ? expression.charAt(pos) : -1;
-            }
-
-            boolean eat(int charToEat) {
-                while (ch == ' ')
-                    nextChar();
-                if (ch == charToEat) {
-                    nextChar();
-                    return true;
-                }
-                return false;
-            }
-
-            double parse() {
-                nextChar();
-                double x = parseExpression();
-                if (pos < expression.length())
-                    throw new RuntimeException("Caractere inesperado: " + (char) ch);
-                return x;
-            }
-
-            double parseExpression() {
-                double x = parseTerm();
-                for (;;) {
-                    if (eat('+'))
-                        x += parseTerm(); // Adição
-                    else if (eat('-'))
-                        x -= parseTerm(); // Subtração
-                    else
-                        return x;
-                }
-            }
-
-            double parseTerm() {
-                double x = parseFactor();
-                for (;;) {
-                    if (eat('*'))
-                        x *= parseFactor(); // Multiplicação
-                    else if (eat('/'))
-                        x /= parseFactor(); // Divisão
-                    else
-                        return x;
-                }
-            }
-
-            double parseFactor() {
-                if (eat('+'))
-                    return parseFactor(); // + unário
-                if (eat('-'))
-                    return -parseFactor(); // - unário
-
-                double x;
-                int startPos = this.pos;
-                if (eat('(')) { // Parênteses
-                    x = parseExpression();
-                    eat(')');
-                } else if ((ch >= '0' && ch <= '9') || ch == '.') { // Números
-                    while ((ch >= '0' && ch <= '9') || ch == '.')
-                        nextChar();
-                    x = Double.parseDouble(expression.substring(startPos, this.pos));
-                } else {
-                    throw new RuntimeException("Caractere inesperado: " + (char) ch);
-                }
-
-                return x;
-            }
-        }.parse();
+        window.setVisible(true);
     }
 }
